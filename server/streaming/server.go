@@ -79,7 +79,7 @@ func InitServer(c *config.Config, airbrakeHandler *airbrake.Handler, producerRul
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", socketServer.ServeBinaryWs(c))
-	mux.Handle("/status", socketServer.airbrakeHandler.WithReporting(http.HandlerFunc(socketServer.Status())))
+	mux.Handle("/status", socketServer.airbrakeHandler.WithReporting(http.HandlerFunc(socketServer.Status(c))))
 
 	server := &http.Server{Addr: fmt.Sprintf("%v:%v", c.Host, c.Port), Handler: serveHTTPWithLogs(mux, logger)}
 	go socketServer.handleAcks()
@@ -118,9 +118,13 @@ func serveHTTPWithLogs(h http.Handler, logger *logrus.Logger) http.Handler {
 }
 
 // Status API shows server with mtls config is up
-func (s *Server) Status() func(w http.ResponseWriter, r *http.Request) {
+func (s *Server) Status(config *config.Config) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = fmt.Fprint(w, "mtls ok")
+		if config.DisableTLS {
+			_, _ = fmt.Fprint(w, "mtls disabled")
+		} else {
+			_, _ = fmt.Fprint(w, "mtls ok")
+		}
 	}
 }
 

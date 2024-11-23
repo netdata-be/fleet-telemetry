@@ -75,8 +75,11 @@ func startServer(config *config.Config, airbrakeNotifier *gobrake.Notifier, logg
 	if server.TLSConfig, err = config.ExtractServiceTLSConfig(logger); err != nil {
 		return err
 	}
-
-	err = server.ListenAndServeTLS(config.TLS.ServerCert, config.TLS.ServerKey)
+	if config.DisableTLS {
+	  err = server.ListenAndServe()
+	} else {
+		err = server.ListenAndServeTLS(config.TLS.ServerCert, config.TLS.ServerKey)
+	}
 	for dispatcher, producer := range dispatchers {
 		logger.ActivityLog("attempting_to_close", logrus.LogInfo{"dispatcher": dispatcher})
 		// We don't care if this fails. If it does, we'll just continue on.

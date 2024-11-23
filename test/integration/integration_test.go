@@ -36,6 +36,10 @@ const (
 
 	kinesisStreamName             = "test_V"
 	kinesisConnectivityStreamName = "test_connectivity"
+
+	subscriptionID = "sub-id-1"
+	mqttBroker     = "mqtt:1883"
+	mqttTopic      = "telemetry/device-1/v/VehicleName"
 )
 
 var expectedLocation = &protos.LocationValue{Latitude: -37.412374, Longitude: 122.145867}
@@ -233,6 +237,11 @@ var _ = Describe("Test messages", Ordered, func() {
 			body, err := VerifyHTTPSRequest(serviceURL, "status", tlsConfig)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(string(body)).To(Equal("mtls ok"))
+		})
+
+		It("reads vehicle data from MQTT broker", func() {
+			err := connection.WriteMessage(websocket.BinaryMessage, payload)
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("returns 200 for status", func() {
