@@ -15,11 +15,11 @@ func (p *MQTTProducer) processVehicleFields(rec *telemetry.Record, payload *prot
 	var tokens []pahomqtt.Token
 	convertedPayload := transformers.PayloadToMap(payload, false, p.logger)
 	for key, value := range convertedPayload {
-		if key == "Vin" || key == "CreatedAt" {
+		if key == "Vin" || key == "CreatedAt" || value == "<invalid>" {
 			continue
 		}
 		mqttTopicName := fmt.Sprintf("%s/%s/v/%s", p.config.TopicBase, rec.Vin, key)
-		jsonValue, err := json.Marshal(map[string]interface{}{"value": value})
+		jsonValue, err := json.Marshal(value)
 		if err != nil {
 			return tokens, fmt.Errorf("failed to marshal JSON for MQTT topic %s: %v", mqttTopicName, err)
 		}
@@ -101,6 +101,38 @@ func (p *MQTTProducer) processVehicleErrors(rec *telemetry.Record, payload *prot
 
 	return tokens, nil
 }
+
+func (p *MQTTProducer) processVehicleConnectivity(rec *telemetry.Record, payload *protos.VehicleConnectivity) ([]pahomqtt.Token, error) {
+	var tokens []pahomqtt.Token
+
+	mqttTopicName := fmt.Sprintf("%s/%s/connection/status", p.config.TopicBase, rec.Vin)
+	jsonValue, err := json.Marshal(payload.Status.String())
+	if err != nil {
+		return tokens, fmt.Errorf("failed to marshal JSON for MQTT topic %s: %v", mqttTopicName, err)
+	}
+	token := p.client.Publish(mqttTopicName, p.config.QoS, p.config.Retained, jsonValue)
+	p.updateMetrics(rec.TxType, len(jsonValue))
+
+	mqttTopicName = fmt.Sprintf("%s/%s/connection/id", p.config.TopicBase, rec.Vin)
+	jsonValue, err = json.Marshal(payload.ConnectionId)
+	if err != nil {
+		return tokens, fmt.Errorf("failed to marshal JSON for MQTT topic %s: %v", mqttTopicName, err)
+	}
+	p.client.Publish(mqttTopicName, p.config.QoS, p.config.Retained, jsonValue)
+	p.updateMetrics(rec.TxType, len(jsonValue))
+
+	mqttTopicName = fmt.Sprintf("%s/%s/connection/since", p.config.TopicBase, rec.Vin)
+	jsonValue, err = json.Marshal(payload.CreatedAt.AsTime().Unix())
+	if err != nil {
+		return tokens, fmt.Errorf("failed to marshal JSON for MQTT topic %s: %v", mqttTopicName, err)
+	}
+	p.client.Publish(mqttTopicName, p.config.QoS, p.config.Retained, jsonValue)
+	p.updateMetrics(rec.TxType, len(jsonValue))
+
+	tokens = append(tokens, token)
+	return tokens, nil
+}
+
 
 func vehicleAlertToMqttMap(alert *protos.VehicleAlert) map[string]interface{} {
 	alertMap := make(map[string]interface{}, 3)
